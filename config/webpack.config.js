@@ -62,7 +62,7 @@ const lessRegex = /\.less$/;
 const lessModuleRegex = /\.module\.less$/;
 
 // Version
-const releaseNumber = require("./package.json").version;
+const releaseNumber = paths.appPackageJson.version;
 
 // Output build path
 let outputPath = undefined;

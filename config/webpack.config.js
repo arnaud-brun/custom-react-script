@@ -32,6 +32,7 @@ const modules = require("./modules");
 const getClientEnvironment = require("./env");
 const ModuleNotFoundPlugin = require("react-dev-utils/ModuleNotFoundPlugin");
 const ForkTsCheckerWebpackPlugin = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+const SentryWebpackPlugin = require("@sentry/webpack-plugin");
 const typescriptFormatter = require("react-dev-utils/typescriptFormatter");
 const eslint = require("eslint");
 // @remove-on-eject-begin
@@ -40,7 +41,7 @@ const getCacheIdentifier = require("react-dev-utils/getCacheIdentifier");
 const postcssNormalize = require("postcss-normalize");
 
 // Source maps are resource heavy and can cause out of memory issue for large source files.
-const shouldUseSourceMap = process.env.GENERATE_SOURCEMAP !== "false";
+let shouldUseSourceMap = process.env.GENERATE_SOURCEMAP !== "false";
 // Some apps do not need the benefits of saving a web request, so not inlining the chunk
 // makes for a smoother build process.
 const shouldInlineRuntimeChunk = process.env.INLINE_RUNTIME_CHUNK !== "false";
@@ -60,11 +61,33 @@ const sassModuleRegex = /\.module\.(scss|sass)$/;
 const lessRegex = /\.less$/;
 const lessModuleRegex = /\.module\.less$/;
 
+// Version
+const releaseNumber = require("./package.json").version;
+
+// Output build path
+let outputPath = undefined;
+
 // This is the production and development configuration.
 // It is focused on developer experience, fast rebuilds, and a minimal bundle.
 module.exports = function(webpackEnv) {
+  // Define additional env configurations
   const isEnvDevelopment = webpackEnv === "development";
   const isEnvProduction = webpackEnv === "production";
+  const isEnvTest = isEnvDevelopment && process.env.NODE_ENV_TEST === "test";
+  const isEnvDemo = isEnvDevelopment && process.env.NODE_ENV_DEMO === "demo";
+
+  // Handle output files, and other specific stuff
+  // Env Development must be checked after demo and test envs !
+  if (isEnvProduction) {
+    outputPath = paths.appBuildProd;
+    shouldUseSourceMap = true; // Always generate a sourcemap in production
+  } else if (isEnvDemo) {
+    outputPath = paths.appBuildDemo;
+  } else if (isEnvTest) {
+    outputPath = paths.appBuildTest;
+  } else if (isEnvDevelopment) {
+    outputPath = paths.appBuildDev;
+  }
 
   // Webpack uses `publicPath` to determine where the app is being served from.
   // It requires a trailing slash, or the file assets will get an incorrect path.
@@ -175,7 +198,7 @@ module.exports = function(webpackEnv) {
     ].filter(Boolean),
     output: {
       // The build folder.
-      path: isEnvProduction ? paths.appBuild : undefined,
+      path: outputPath,
       // Add /* filename */ comments to generated require()s in the output.
       pathinfo: isEnvDevelopment,
       // There will be one main bundle, and one file per asynchronous chunk.
@@ -731,7 +754,7 @@ module.exports = function(webpackEnv) {
         }),
       isEnvProduction &&
         new SentryWebpackPlugin({
-          release: "release-20",
+          release: "release-" + releaseNumber,
           include: "./builds/prod",
           ignoreFile: ".sentrycliignore",
           ignore: ["node_modules", "webpack.config.js"]
